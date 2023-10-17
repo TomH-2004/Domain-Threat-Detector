@@ -1,6 +1,6 @@
 go 1.21.0
 
 use (
-	..\Jail-creator-for-FreeBSD\go
+	..\Jail-creator-for-FreeBSD\jails
 	sat5
 )
