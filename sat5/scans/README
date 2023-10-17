@@ -1,0 +1,131 @@
+This is a scanner made for wordpress documents. use go run main.go.
+default log location:   scanlog.txt
+edit any search phrases freely in the main.go file to suit your needs.
+default scan frequency: once per day. see the bottom of the main function to change. 
+
+surround code in "//ignore" to enable ignore mode (doesnt scan code inside block)
+
+
+set const for database authentication.
+
+const for phrase prio, can do differnet things when phrases of set prio are detected, is integer, 1=low, 2=Medium 3=High
+set Phrase priority when making a new phrase in "searchPhrases" 
+
+
+const for text highlighting. adds differnet colors depending on phrase prio. only works in terminal, can do some different things 
+with it now since its not really used. when phrase prio=3 texthighlight=red, when prio=2 texthighlight=orange, when prio=1 texthighlight=default
+
+structure for SearchPhrase. sets phrase to string, includes phrase priority and also introduces "selected" which allows the user to toggle whether
+that phrase will be scanned for or not. this is a boolean value, true=scan, false=dont scan.
+
+
+wordpriority function. is just a case function, takes the word prio as the case, and returns corisponding value. LowPriority=Low, MediumPriority=Medium,
+HighPriority=High. and returns a value of "unknown" if no prio is specified (a bit useless however since it would result in an error regardless)
+
+
+SearchFile function. this func takes 2 params. the filepath, from the "path/filepath" import, which is a string. and it also takes the searchPhrases func as a param.
+it starts with useing the filecontent variable which is defined later on line 442, it uses ioutill to read all the contents of filepath. so, filecontent is just using ioutill
+to read the contens of file path, and also using an err variable, which when it is not = nil, then it returns an empty string and an error.
+
+then i am declaring a new variable called lines. this variable is using the strings import in the context of "strings.split" which slices s into all substrings separated by sep
+and returns a slice of the substrings between those separators, and its doing this for the content of the file.
+
+then printing out a message "Scanning file:" with the file path at the end of it.
+
+im then opening a new forloop. in this loop im setting new variables, "lineNum" and "line" and setting it equal to the range of lines that were found earlier using the stings.split command.
+inside that forloop, were making another forloop "for _, phrase := range searchPhrases" this is looking through all of the lines that have been split, and is looking for where phrases inside of
+the "searchPhrases" struct appear there. just after that, im using an if statement to detemine wether or not the boolean value of that phrase is set to false. if it is, then it simply continues
+the search onto the next appearance of a phrase. 
+
+after that. im making 2 new varibales. one called "lowerLine" and the other called "lowerPhrase" these are used to search for lowercase appearances of the phrases.
+
+im then making a new if statement. "if strings.Contains(lowerLine, lowerPhrase)" this is simply checking if the lowercase line contains the lowercase SearchPhrase.
+if a result is found, then its printing a result string as follows "result := fmt.Sprintf("  - Found \"%s\" (Priority: %s) in \"%s\" at line %d: %s\n",
+that string is inputing the phrase, priority, filepath, line number and a set text highlighting depending on the phrases priority.
+
+after that. i am simply appending the result to the "scanResults" string builder for later use regarding logging and emails.
+i am also returing the accumulated scan resuls as a string.
+
+
+
+
+a function for highlightText. this is just were the color of the highlighting is detemined based on the value of the prio. so, Medium = orange, High = red, default = return text (no highlighting).
+
+
+
+
+Main function. starts by making a connection to the database using the values detemined early in the database struct.
+
+SearchPhrase structure. this is just a large list of phrases thats using the struct that was made earlier at the start of the program. its easily expandable. this is how each line should look:
+{Phrase: "base64(", Priority: HighPriority, Selected: true},  it declars the phrase, then priority, then if its selected or not using a boolean value.
+
+
+setting variables for the directory path that will be scanned. and also the name of the file that will be used to store the logs.
+
+
+this is just a very big forloop, it starts by printing that its starting the scan. and makes some new variables "startTime" in order to track duration of scan, "domainScabResults" which is making a new map of type string,
+where keys are strings and values are of type "DomainInfo".
+there is also the "subdirs" variable. which is just using ioutill to read all the contents of the dirPath, to see how many sub directories it has, and what there names are.
+
+after that, im using a forloop to check the range of subdirs inside the specified directory. and if there are none, then it continues.
+
+im making a new variable here called domainName, this is equal to the value of the subdir name.
+and another variable called subdirPath, which simply  constructs the full path to the subdirectory by joining the dirPath (the path to the parent directory) and the domainName (the name of the subdirectory).
+
+after that, im making another variable called "numFiles" which is simply counting all the files inside of the subdirectory path.
+
+then i am setting the default value for domain info. this is what is displayed in the logs and on the database. the default value has a name = to the value of domainName, has a status of offline, and has 0 threats.
+
+just after that, i am making an if statement to detemine if the number of files per subdirectory is greater than 0, if it is, then its setting the DomainInfo status to "online" as having 0 files in the subdirectory would suggest that
+the domain is offline.
+
+im then setting a new variable, fileResults = searchFileWithUserSelection. this is a function which is made later on, on line 441. this variable also includes the filepath and searchPhrases variables. , it takes the current count of threats in domainInfo.Threats,
+adds the count of threats found in a specific file (provided by countThreatsPerFile(fileResults)), and updates domainInfo.Threats with the new total count of threats for that domain. its just a way to keep a running count of the amount of threats.
+
+
+
+just after that, i have this line "domainScanResults[domainName] = domainInfo". this either updates the existing entry in the domainScanResults map with the domainInfo value (if an entry with the same domainName key already exists),
+or it adds a new entry to the map with the domainName key and associates it with the domainInfo value. In essence, it's populating the domainScanResults map with information about different domains, where each domain is identified by its name.
+
+this starts off by updating the database using the updateDatabase function which is on line 384.
+after that, its making two new variables, "currenttime" which gets the current time, and "logEntry". this contains everything which will be logged from the program.
+theres also another variable being made called "totalThreats" which is just taking the result from the countTotalThreats function on line 371.
+
+im then simply adding more values to the logEntry variable containing the new data ive pulled from the countTotalThreats function.
+
+after that, i have a forloop. This for loop generates a detailed log entry for each domain, including information about the domain itself, its status, the number of threats detected, and details of any threats found within its files.
+The log entry is constructed as a string (logEntry) and is built up progressively as the loop iterates through the domains in domainScanResults.
+
+
+here im calling the SendEmailFunc function. this function is on line 288. however on line 280 i am simply filling out a form in a way, it starts with the email recipiant, then the email address the email will be sent from, the email password, the smtp host, port, subject and email message,
+which in this case is just logEntry.
+
+
+i am sleeping the program for 24 hours. so it runs the program once per day, to avoid being spammed by emails.
+
+
+this is the SendEmailFunc function. there isnt too much to it, it effectively just sends an email with the specified parameters, including recipient, sender, subject, and message body, using the provided SMTP server and optional authentication.
+
+this is the countFiles function, in summary, the countFiles function provides a convenient way to count the number of files within a specified directory, making it useful for tasks like directory analysis or processing files within a folder.
+
+
+This is the function countTotalThreats, this function calculates the total number of threats by iterating through a map of domain information and summing up the threat counts for each domain.
+It's a useful function for summarizing the overall threat level across multiple domains.
+
+
+countThreatsPerFile function. this function wokrs exactly the same as the total threats file. however, it is going into each file individually to check for the threats, and storing them in a variable called "occurrences"
+
+
+updateDatabase function. this function is responsible for updating an SQL database with information about threats for different domains.
+It checks if a domain's record already exists in the database and either updates the existing record or inserts a new record, depending on whether an existing record is found.
+
+
+here im making a structure for DomainInfo. its setting the Name to string, Status to string, and Threats to an integer.
+
+
+This is the appendToLogFile function, this function is responsible for appending text to a specified file.
+It first opens the file in append mode (or creates it if it doesn't exist), writes the provided text to the file, ensures that the file is properly closed, and returns an error if any issues are encountered during these operations.
+
+
+searchFileWithUserSelection function.  this function reads a file, searches for specific phrases (based on user selection and case-insensitive matching), and compiles the results into a formatted string, which is then returned.
+It's used for scanning files for potential threats based on predefined search phrases.
